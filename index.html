@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en" style="--vh: 1vh; --dynamic-card-width: var(--card-width-lg); --dynamic-card-height: var(--card-height-lg);">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matrix Blackjack - Desktop Terminal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --matrix-green: #00ff41;
+            --matrix-dark: #0d0208;
+            --matrix-dim: #003b00;
+            /* Large Screen Fixed Sizing */
+            --card-width-lg: 110px;
+            --card-height-lg: 155px;
+            --vh: 1vh;
+        }
+
+        body {
+            background-color: black;
+            color: var(--matrix-green);
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            overflow: hidden; 
+            touch-action: manipulation; 
+        }
+
+        /* Glitch text effect */
+        .glitch-text {
+            text-shadow: 2px 0 var(--matrix-dim), -2px 0 var(--matrix-dim);
+            animation: glitch 1s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch {
+            0% { transform: skewX(-10deg); }
+            5% { transform: skewX(10deg); }
+            10% { transform: skewX(-5deg); }
+            15% { transform: skewX(5deg); }
+            20% { transform: skewX(0deg); }
+            100% { transform: skewX(0deg); }
+        }
+
+        /* CRT Scanline effect */
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Glowing borders and text */
+        .neon-border {
+            border: 1px solid var(--matrix-green);
+            box-shadow: 0 0 8px var(--matrix-green), inset 0 0 4px var(--matrix-green); 
+        }
+
+        .neon-text {
+            text-shadow: 0 0 5px var(--matrix-green);
+        }
+
+        /* DESKTOP ENFORCEMENT STYLES */
+        #mobile-warning {
+            display: block;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: black; /* Solid black */
+            z-index: 100; /* Above scanlines (50) and game */
+        }
+
+        #game-container {
+            display: none !important; /* Hidden by default on small screens */
+            height: calc(var(--vh, 1vh) * 100);
+        }
+
+        /* Only show game on screens wider than 1024px (Typical Desktop/Laptop) */
+        @media (min-width: 1024px) {
+            #mobile-warning {
+                display: none !important;
+            }
+            #game-container {
+                display: flex !important;
+            }
+        }
+
+        /* Card Styling */
+        .card {
+            width: var(--card-width-lg);
+            height: var(--card-height-lg);
+            background: 
+                radial-gradient(circle at center, rgba(0, 59, 0, 0.8) 0%, rgba(0, 0, 0, 1) 70%), 
+                repeating-linear-gradient(
+                0deg,
+                #000 0px,
+                #000 2px,
+                #003b00 2px,
+                #003b00 4px
+            );
+            border: 2px solid var(--matrix-green);
+            border-radius: 8px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 10px;
+            position: relative;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.5), inset 0 0 5px rgba(0, 255, 65, 0.2); 
+            transition: transform 0.3s ease;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 0 25px var(--matrix-green);
+        }
+
+        .card-corner-top, .card-corner-bottom {
+            align-self: flex-start;
+            font-size: 1.3rem;
+            line-height: 1;
+            text-shadow: 0 0 2px var(--matrix-green); 
+        }
+        
+        .card-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3.5rem;
+            text-shadow: 0 0 8px var(--matrix-green);
+        }
+
+        .card-corner-bottom {
+            align-self: flex-end;
+            transform: rotate(180deg);
+        }
+
+        /* Card Back */
+        @keyframes pulse-glow {
+            from { box-shadow: 0 0 10px rgba(0, 255, 65, 0.5); }
+            to { box-shadow: 0 0 20px rgba(0, 255, 65, 1); }
+        }
+
+        .card-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse-glow 2s infinite alternate;
+        }
+        .card-back::after {
+            content: "?"; 
+            font-size: 2.5rem;
+            color: var(--matrix-green);
+            text-shadow: 0 0 10px var(--matrix-green);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-deal {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        /* Score Display Styling */
+        .score-display {
+            font-size: 2.5rem;
+            text-shadow: 0 0 5px var(--matrix-green);
+            color: var(--matrix-green);
+        }
+        
+        /* Hand Sections */
+        .hand-section {
+            padding: 1rem 0; 
+            margin: 0.5rem 0; 
+            flex-shrink: 1; 
+        }
+
+    </style>
+</head>
+<body class="h-full w-full flex flex-col items-center justify-center select-none overflow-hidden">
+
+    <canvas id="matrix-rain" class="fixed top-0 left-0 w-full h-full z-0 opacity-40"></canvas>
+    
+    <div class="scanlines"></div>
+
+    <!-- Mobile Warning Overlay: Pure Black Screen -->
+    <div id="mobile-warning"></div>
+
+    <!-- Game Container (Visible only on Desktop) -->
+    <div id="game-container" class="relative z-10 w-full max-w-5xl max-h-screen flex flex-col p-8 bg-black border-x border-green-900/50">
+        
+        <header class="flex justify-between items-end border-b border-green-800 pb-6 mb-6 shrink-0">
+            <div>
+                <h1 class="text-5xl font-bold neon-text tracking-widest">BLACKJACK</h1>
+                <p class="text-xs text-green-700 mt-1">STATUS: <span id="system-status" class="text-green-400 animate-pulse">CONNECTED_DESKTOP</span></p>
+            </div>
+            <div class="text-right">
+                <div class="text-base text-green-700">CREDITS</div>
+                <div id="credits-display" class="text-4xl font-bold neon-text">1000</div>
+            </div>
+        </header>
+
+        <div class="flex-grow flex flex-col justify-center relative min-h-[0]">
+            
+            <div class="hand-section flex flex-col items-center mb-8 border-b border-green-900/50 flex-shrink">
+                <div id="dealer-hand" class="flex justify-center items-center min-h-[140px]"></div>
+                <div class="flex justify-center items-center w-full py-2">
+                    <span class="text-base tracking-widest text-green-600 mr-4">:: DEALER ::</span>
+                    <span id="dealer-score" class="score-display"></span>
+                </div>
+            </div>
+
+            <div id="message-area" class="h-16 flex items-center justify-center text-center my-4 shrink-0">
+                <p id="game-message" class="text-3xl font-bold neon-text text-white animate-pulse">PLACE YOUR BET</p>
+            </div>
+
+            <div class="hand-section flex flex-col items-center mt-8 border-t border-green-900/50 flex-shrink">
+                <div class="flex justify-center items-center w-full py-2">
+                    <span class="text-base tracking-widest text-green-600 mr-4">:: PLAYER ::</span>
+                    <span id="player-score" class="score-display"></span>
+                </div>
+                <div id="player-hand" class="flex justify-center items-center min-h-[140px]"></div>
+            </div>
+
+        </div>
+
+        <div class="border-t border-green-800 pt-6 pb-2 shrink-0">
+            
+            <div id="betting-controls" class="flex flex-wrap justify-center items-center gap-6 w-full">
+                <div class="flex items-center space-x-2 w-auto order-1">
+                    <div class="text-green-500 text-base">BET:</div>
+                    <div id="current-bet" class="text-white font-bold text-xl neon-text">100</div>
+                </div>
+                <div class="flex gap-2 w-auto justify-end order-2">
+                    <button onclick="adjustBet(-50)" class="neon-border px-4 py-2 hover:bg-green-900/30 active:bg-green-900/50 transition font-bold text-xl">-</button>
+                    <button onclick="adjustBet(50)" class="neon-border px-4 py-2 hover:bg-green-900/30 active:bg-green-900/50 transition font-bold text-xl">+</button>
+                </div>
+                <button onclick="startGame()" class="neon-border px-10 py-3 bg-green-900/20 hover:bg-green-500 hover:text-black transition font-bold tracking-wider text-lg w-auto order-3">DEAL_HAND()</button>
+            </div>
+
+            <div id="action-controls" class="hidden flex justify-center items-center gap-6">
+                <button onclick="hit()" id="btn-hit" class="neon-border px-8 py-3 bg-black hover:bg-green-900/30 active:bg-green-900/50 transition font-bold tracking-wider text-lg w-48">HIT</button>
+                <button onclick="stand()" id="btn-stand" class="neon-border px-8 py-3 bg-black hover:bg-green-900/30 active:bg-green-900/50 transition font-bold tracking-wider text-lg w-48">STAND</button>
+            </div>
+            
+            <div id="result-controls" class="hidden flex justify-center items-center w-full">
+                <button onclick="resetGame()" class="neon-border w-auto px-10 py-3 bg-green-900/20 hover:bg-green-500 hover:text-black transition font-bold tracking-wider animate-pulse text-lg">REBOOT_SYSTEM()</button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Matrix Rain Effect
+         */
+        const canvas = document.getElementById('matrix-rain');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const cols = Math.floor(width / 20) + 1;
+        const ypos = Array(cols).fill(0);
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            if(Math.floor(width/20)+1 !== ypos.length) {
+                const newCols = Math.floor(width / 20) + 1;
+                while(ypos.length > newCols) ypos.pop();
+                while(ypos.length < newCols) ypos.push(0);
+            }
+        });
+
+        function matrix() {
+            ctx.fillStyle = '#0001';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#0f0';
+            ctx.font = '15pt monospace';
+
+            ypos.forEach((y, ind) => {
+                const text = String.fromCharCode(Math.random() * 128);
+                const x = ind * 20;
+                ctx.fillText(text, x, y);
+                if (y > 100 + Math.random() * 10000) ypos[ind] = 0;
+                else ypos[ind] = y + 20;
+            });
+        }
+        setInterval(matrix, 50);
+
+        /**
+         * Game Logic
+         */
+        
+        // State
+        const suits = ['♥', '♦', '♣', '♠'];
+        const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        let deck = [];
+        let playerHand = [];
+        let dealerHand = [];
+        let credits = 1000;
+        let bet = 100;
+        let gameActive = false;
+        const MIN_BET = 50; 
+        
+        // DOM Elements
+        const dealerHandEl = document.getElementById('dealer-hand');
+        const playerHandEl = document.getElementById('player-hand');
+        const dealerScoreEl = document.getElementById('dealer-score');
+        const playerScoreEl = document.getElementById('player-score');
+        const creditsEl = document.getElementById('credits-display');
+        const currentBetEl = document.getElementById('current-bet');
+        const messageEl = document.getElementById('game-message');
+        
+        // Sections
+        const bettingControls = document.getElementById('betting-controls');
+        const actionControls = document.getElementById('action-controls');
+        const resultControls = document.getElementById('result-controls');
+
+        function log(msg) {
+            console.log(`[Blackjack System] ${msg}`);
+        }
+
+        log("System initialized. Desktop environment detected.");
+        
+        function createDeck() {
+            deck = [];
+            for (let suit of suits) {
+                for (let value of values) {
+                    deck.push({ suit, value });
+                }
+            }
+            shuffleDeck();
+        }
+
+        function shuffleDeck() {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function getCardValue(card) {
+            if (['J', 'Q', 'K'].includes(card.value)) return 10;
+            if (card.value === 'A') return 11;
+            return parseInt(card.value);
+        }
+
+        function calculateScore(hand) {
+            let score = 0;
+            let aces = 0;
+
+            for (let card of hand) {
+                score += getCardValue(card);
+                if (card.value === 'A') aces++;
+            }
+
+            while (score > 21 && aces > 0) {
+                score -= 10;
+                aces--;
+            }
+            return score;
+        }
+
+        function createCardElement(card, isHidden = false) {
+            const div = document.createElement('div');
+            div.className = 'card animate-deal'; 
+            
+            if (isHidden) {
+                div.classList.add('card-back');
+                div.id = 'hidden-card';
+                return div;
+            }
+
+            const top = document.createElement('div');
+            top.className = 'card-corner-top';
+            top.innerHTML = `${card.value}<br>${card.suit}`;
+
+            const center = document.createElement('div');
+            center.className = 'card-center';
+            center.innerHTML = `${card.suit}`;
+
+            const bottom = document.createElement('div');
+            bottom.className = 'card-corner-bottom';
+            bottom.innerHTML = `${card.value}<br>${card.suit}`;
+
+            div.appendChild(top);
+            div.appendChild(center);
+            div.appendChild(bottom);
+
+            return div;
+        }
+
+        function renderHands(revealDealer = false) {
+            dealerHandEl.innerHTML = '';
+            playerHandEl.innerHTML = '';
+
+            dealerHand.forEach((card, index) => {
+                const delay = index * 0.1;
+                let cardEl;
+                if (index === 0 && !revealDealer) {
+                    cardEl = createCardElement(card, true);
+                } else {
+                    cardEl = createCardElement(card);
+                }
+                cardEl.style.animationDelay = `${delay}s`;
+                dealerHandEl.appendChild(cardEl);
+            });
+
+            playerHand.forEach((card, index) => {
+                const delay = index * 0.1;
+                const cardEl = createCardElement(card);
+                cardEl.style.animationDelay = `${delay}s`;
+                playerHandEl.appendChild(cardEl);
+            });
+
+            const pScore = calculateScore(playerHand);
+            playerScoreEl.innerText = pScore;
+            
+            if (revealDealer) {
+                const dScore = calculateScore(dealerHand);
+                dealerScoreEl.innerText = dScore;
+            } else {
+                const revealedCard = dealerHand[1];
+                const hintScore = getCardValue(revealedCard);
+                dealerScoreEl.innerText = `[${hintScore} + ?]`;
+            }
+        }
+
+        function showMessage(text) {
+            messageEl.classList.remove('hidden');
+            messageEl.innerText = text;
+            messageEl.classList.add('text-white');
+            messageEl.classList.add('animate-pulse');
+            messageEl.classList.remove('glitch-text', 'text-red-500');
+        }
+
+        function adjustBet(amount) {
+            if (gameActive) return;
+            const newBet = bet + amount;
+
+            if (newBet <= 0) return;
+            if (newBet > credits) return;
+            if (credits >= MIN_BET && newBet < MIN_BET) return; 
+            if (credits > 0 && credits < MIN_BET && newBet < credits) return;
+            
+            bet = newBet;
+            currentBetEl.innerText = bet;
+        }
+
+        function updateCreditsUI() {
+            creditsEl.innerText = credits;
+        }
+
+        function startGame() {
+            if (credits <= 0) {
+                return;
+            }
+            
+            const isAllInBelowMin = (credits > 0 && credits < MIN_BET && bet === credits);
+            if ((bet < MIN_BET && !isAllInBelowMin) || bet > credits) {
+                return;
+            }
+
+            gameActive = true;
+            credits -= bet;
+            updateCreditsUI();
+            
+            deck = [];
+            playerHand = [];
+            dealerHand = [];
+            createDeck();
+            
+            playerHand.push(deck.pop());
+            dealerHand.push(deck.pop());
+            playerHand.push(deck.pop());
+            dealerHand.push(deck.pop());
+
+            // Render hands after dealing
+            renderHands(false);
+            
+            bettingControls.classList.add('hidden');
+            actionControls.classList.remove('hidden');
+            resultControls.classList.add('hidden');
+            messageEl.classList.add('hidden'); 
+
+            log(`Dealing hand. Bet: ${bet}.`);
+            
+            const pScore = calculateScore(playerHand);
+            if (pScore === 21) {
+                setTimeout(handleBlackjack, 1000); 
+            }
+        }
+
+        function hit() {
+            if (!gameActive) return;
+            log("Player requests HIT.");
+            const card = deck.pop();
+            playerHand.push(card);
+            renderHands(false); 
+
+            if (calculateScore(playerHand) > 21) {
+                setTimeout(() => endGame("bust"), 800);
+            }
+        }
+
+        function stand() {
+            if (!gameActive) return;
+            log("Player stands.");
+            document.getElementById('btn-hit').disabled = true;
+            document.getElementById('btn-stand').disabled = true;
+
+            setTimeout(dealerTurn, 500);
+        }
+
+        function dealerTurn() {
+            renderHands(true); 
+            
+            let dScore = calculateScore(dealerHand);
+            log(`Dealer shows ${dScore}.`);
+
+            const loop = setInterval(() => {
+                if (dScore < 17) {
+                    log("Dealer hits.");
+                    const card = deck.pop();
+                    dealerHand.push(card);
+                    renderHands(true); 
+                    dScore = calculateScore(dealerHand);
+                } else {
+                    clearInterval(loop);
+                    setTimeout(determineWinner, 800);
+                }
+            }, 800);
+        }
+
+        function handleBlackjack() {
+            renderHands(true);
+            const dScore = calculateScore(dealerHand);
+            if (dScore === 21) {
+                endGame("push");
+            } else {
+                endGame("blackjack");
+            }
+        }
+
+        function determineWinner() {
+            const pScore = calculateScore(playerHand);
+            const dScore = calculateScore(dealerHand);
+
+            log(`Result: P[${pScore}] vs D[${dScore}]`);
+
+            if (pScore > 21) {
+                endGame("bust");
+            } else if (dScore > 21) {
+                endGame("dealer_bust");
+            } else if (pScore > dScore) {
+                endGame("win");
+            } else if (pScore < dScore) {
+                endGame("lose");
+            } else {
+                endGame("push");
+            }
+        }
+
+        function endGame(reason) {
+            gameActive = false;
+            actionControls.classList.add('hidden');
+            resultControls.classList.remove('hidden');
+            document.getElementById('btn-hit').disabled = false;
+            document.getElementById('btn-stand').disabled = false;
+
+            let winnings = 0;
+
+            switch (reason) {
+                case "bust":
+                    showMessage("SYSTEM FAILURE (BUST)");
+                    break;
+                case "dealer_bust":
+                    winnings = bet * 2;
+                    showMessage("AGENT CRASHED (WIN)");
+                    break;
+                case "win":
+                    winnings = bet * 2;
+                    showMessage("YOU ARE THE ONE (WIN)");
+                    break;
+                case "lose":
+                    showMessage("THE HOUSE WINS");
+                    break;
+                case "push":
+                    winnings = bet;
+                    showMessage("GLITCH IN MATRIX (PUSH)");
+                    break;
+                case "blackjack":
+                    winnings = bet * 2.5; 
+                    showMessage("PURE CODE (BLACKJACK!)");
+                    break;
+            }
+
+            if (winnings > 0) {
+                credits += Math.floor(winnings);
+                updateCreditsUI();
+            }
+
+            if (credits <= 0) {
+                credits = 0;
+                log("CRITICAL ERROR: Zero Credits. Player must insert coins.");
+                updateCreditsUI();
+            }
+        }
+
+        function resetGame() {
+            resultControls.classList.add('hidden');
+            bettingControls.classList.remove('hidden');
+            
+            if (credits <= 0) {
+                bet = 0;
+                showMessage("CREDITS ZERO. SYSTEM LOCKED.");
+            } else if (credits < MIN_BET) {
+                 bet = credits; 
+                 showMessage("PLACE YOUR BET"); 
+            } else {
+                 bet = Math.min(100, credits); 
+                 showMessage("PLACE YOUR BET");
+            }
+            currentBetEl.innerText = bet;
+
+            dealerHandEl.innerHTML = '';
+            playerHandEl.innerHTML = '';
+            dealerScoreEl.innerText = '';
+            playerScoreEl.innerText = '';
+            
+            log("System reset. Ready for new input.");
+        }
+        
+        resetGame();
+
+    </script>
+</body>
+</html>
